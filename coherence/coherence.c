@@ -30,6 +30,7 @@ coher* init(coher_sim_args* csa)
         {
             case 's':
                 cs = atoi(optarg);
+                printf("cs is MSI: %s \n", (cs == MSI) ? "true" : "false");
                 break;
         }
     }
@@ -102,7 +103,8 @@ uint8_t busReq(bus_req_type reqType, uint64_t addr, int processorNum)
                 = snoopMI(reqType, &ca, currentState, addr, processorNum);
             break;
         case MSI:
-            // TODO: Implement this.
+            nextState
+                = snoopMSI(reqType, &ca, currentState, addr, processorNum);
             break;
         case MESI:
             // TODO: Implement this.
@@ -147,6 +149,13 @@ uint8_t busReq(bus_req_type reqType, uint64_t addr, int processorNum)
     return 0;
 }
 
+/**
+ * Cache requests permission status for given address
+ * @param is_read - if read or write ??? Ignore??
+ * @param addr - address to check permissions for
+ * @param processorNum - identifier for which processor is making the requeust
+ * @return bool - true or false
+*/
 uint8_t permReq(uint8_t is_read, uint64_t addr, int processorNum)
 {
     if (processorNum < 0 || processorNum >= processorCount)
@@ -166,7 +175,8 @@ uint8_t permReq(uint8_t is_read, uint64_t addr, int processorNum)
             break;
 
         case MSI:
-            // TODO: Implement this.
+            nextState = cacheMSI(is_read, &permAvail, currentState, addr, 
+                                processorNum);
             break;
 
         case MESI:
@@ -217,6 +227,13 @@ uint8_t invlReq(uint64_t addr, int processorNum)
 
         case MSI:
             // TODO: Implement this.
+            nextState = INVALID;
+
+            if (currentState == SHARE){
+            } else if (currentState == MODIFIED){
+                inter_sim->busReq(DATA, addr, processorNum);
+                flush = 1;
+            }
             break;
         case MESI:
             // TODO: Implement this.
