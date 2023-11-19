@@ -30,7 +30,6 @@ coher* init(coher_sim_args* csa)
         {
             case 's':
                 cs = atoi(optarg);
-                printf("cs is MSI: %s \n", (cs == MSI) ? "true" : "false");
                 break;
         }
     }
@@ -228,10 +227,10 @@ uint8_t invlReq(uint64_t addr, int processorNum)
         case MSI:
             // TODO: Implement this.
             nextState = INVALID;
-
+            
             if (currentState == SHARE){
             } else if (currentState == MODIFIED){
-                inter_sim->busReq(DATA, addr, processorNum);
+                inter_sim->busReq(DATA, addr, processorNum); //use when flushing
                 flush = 1;
             }
             break;

@@ -127,7 +127,7 @@ cacheMSI(uint8_t is_read, uint8_t* permAvail, coherence_states currentState,
             } else {
                 *permAvail = 0;
                 sendBusWr(addr, procNum);
-                return MODIFIED; 
+                return INVALID_MODIFIED; 
             }
 
         default:
@@ -158,6 +158,7 @@ snoopMSI(bus_req_type reqType, cache_action* ca, coherence_states currentState,
             return INVALID; 
 
         case MODIFIED:
+            sendData(addr, procNum);
             if (reqType == BUSRD){
                 return SHARE;
             } else if (reqType == BUSWR) {
@@ -175,9 +176,9 @@ snoopMSI(bus_req_type reqType, cache_action* ca, coherence_states currentState,
         case INVALID_SHARED:
             if (reqType == DATA || reqType == SHARED){
                 *ca = DATA_RECV;
-                return MODIFIED;
+                return SHARE;
             }
-            return INVALID_MODIFIED; 
+            return INVALID_SHARED; 
 
         case SHARE:
             if (reqType == BUSWR){
