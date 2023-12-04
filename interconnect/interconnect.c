@@ -381,9 +381,46 @@ void printPending(){
     }
 }
 
+void printNode(node* nodeto){
+    if(nodeto->data == NULL){
+        printv("NULL Node\n");
+    } else if (nodeto->data->request == NULL){
+        printv("Node (waiting type) Address: %lu | ProcNum: %d\n", nodeto->data->addr, nodeto->data->procnum);
+        return; 
+    }
+    printv("Node (bus request type) Address: %lu | ProcNum: %d | CountDown = %d | currentState: ", nodeto->data->request->addr,nodeto->data->request->procNum, nodeto->data->request->countDown);
+    
+    switch(nodeto->data->request->currentState){
+        case(NONE):
+            printv("NONE\n");
+            break;
+        case(QUEUED):
+            printv("QUEUED\n");
+            break;
+        case(TRANSFERING_CACHE):
+            printv("TRANSFERING_CACHE\n");
+            break;
+        case(TRANSFERING_MEMORY):
+            printv("TRANSFERING_MEMORY\n");
+            break;
+        case(WAITING_CACHE):
+            printv("WAITING_CACHE\n");
+            break;
+        case(WAITING_MEMORY):
+            printv("WAITING_MEMORY\n");
+            break;
+        default:
+            printv("ERROR\n");
+            break;
+    }
+}
+
 int tick()
 {
     myticker++;
+    if(myticker > 150){
+        assert(false);
+    }
     printv("tick count = %d\n", myticker);
     printProcessing();
     printPending();
@@ -408,83 +445,89 @@ int tick()
     {
         printInterconnState();
     }
-    node* tempreq = processing->top;
-    while(tempreq != NULL){
-        printv("updating node\n");
-        bus_req* currreq = tempreq->data->request; 
-        int countDown = tempreq->data->request->countDown;
+    node** tempreq = &processing->top;
+    while((*tempreq) != NULL){
+        printv("updating: "); printNode((*tempreq));
+        bus_req* currreq = (*tempreq)->data->request; 
+        int *countDown = &((*tempreq)->data->request->countDown);
         if (countDown > 0)
         {
             assert(currreq != NULL);
-            tempreq->data->request->countDown--;
+            (*countDown)--; 
 
             // If the count-down has elapsed (or there hasn't been a
             // cache-to-cache transfer, the memory will respond with
             // the data.
-            if (tempreq->data->request->dataAvail)
+            if ((*tempreq)->data->request->dataAvail)
             {
-                tempreq->data->request->currentState = TRANSFERING_MEMORY;
-                tempreq->data->request->countDown = 0;
+                (*tempreq)->data->request->currentState = TRANSFERING_MEMORY;
+                (*tempreq)->data->request->countDown = 0;
             }
 
-            if (countDown == 0)
+            if ((*countDown) == 0)
             {
-                if (tempreq->data->request->currentState == WAITING_CACHE)
+                printv("countdown up ---------------\n");
+                if ((*tempreq)->data->request->currentState == WAITING_CACHE)
                 {
+                    printv("making Mempry request\n");
                     // Make a request to memory.
-                    tempreq->data->request->countDown
-                        = memComp->busReq(tempreq->data->request->addr,
-                                        tempreq->data->request->procNum, memReqCallback);
+                    (*tempreq)->data->request->countDown
+                        = memComp->busReq((*tempreq)->data->request->addr,
+                                        (*tempreq)->data->request->procNum, memReqCallback);
 
-                    tempreq->data->request->currentState = WAITING_MEMORY;
+                    (*tempreq)->data->request->currentState = WAITING_MEMORY;
 
                     // The processors will snoop for this request as well.
                     for (int i = 0; i < processorCount; i++)
                     {
-                        if (tempreq->data->request->procNum != i)
+                        if ((*tempreq)->data->request->procNum != i)
                         {
-                            coherComp->busReq(tempreq->data->request->brt,
-                                            tempreq->data->request->addr, i);
+                            coherComp->busReq((*tempreq)->data->request->brt,
+                                            (*tempreq)->data->request->addr, i);
                         }
                     }
 
-                    if (tempreq->data->request->data == 1)
+                    if ((*tempreq)->data->request->data == 1)
                     {
-                        tempreq->data->request->brt = DATA;
+                        (*tempreq)->data->request->brt = DATA;
                     }
                 }
-                else if (tempreq->data->request->currentState == TRANSFERING_MEMORY)
+                else if ((*tempreq)->data->request->currentState == TRANSFERING_MEMORY)
                 {
+                    printv("tranfsering memory\n");
                     bus_req_type brt
-                        = (tempreq->data->request->shared == 1) ? SHARED : DATA;
-                    coherComp->busReq(brt, tempreq->data->request->addr,
-                                    tempreq->data->request->procNum);
+                        = ((*tempreq)->data->request->shared == 1) ? SHARED : DATA;
+                    coherComp->busReq(brt, (*tempreq)->data->request->addr,
+                                    (*tempreq)->data->request->procNum);
 
                     interconnNotifyState();
-                    free(tempreq->data->request);
-                    tempreq->data->request = NULL;
+                    printv("freeing structure\n");
+                    free((*tempreq)->data->request);
+                    (*tempreq)->data->request = NULL;
                     //TODO delete node
-                    delNode(&processing, &tempreq);
+                    printv("deleting node\n");
+                    delNode(&processing, &(*tempreq));
                 }
-                else if (tempreq->data->request->currentState == TRANSFERING_CACHE)
+                else if ((*tempreq)->data->request->currentState == TRANSFERING_CACHE)
                 {
-                    bus_req_type brt = tempreq->data->request->brt;
-                    if (tempreq->data->request->shared == 1)
+                    printv("tranfsering cache\n");
+                    bus_req_type brt = (*tempreq)->data->request->brt;
+                    if ((*tempreq)->data->request->shared == 1)
                         brt = SHARED;
 
-                    coherComp->busReq(brt, tempreq->data->request->addr,
-                                    tempreq->data->request->procNum);
+                    coherComp->busReq(brt, (*tempreq)->data->request->addr,
+                                    (*tempreq)->data->request->procNum);
 
                     interconnNotifyState();
-                    free(tempreq->data->request);
-                    tempreq->data->request = NULL;
+                    free((*tempreq)->data->request);
+                    (*tempreq)->data->request = NULL;
 
                     //todo delete node
-                    delNode(&processing, &tempreq);
+                    delNode(&processing, &(*tempreq));
                 }
             }
         }
-        else if (countDown == 0)
+        else if ((*countDown) == 0)
         {
             for (int i = 0; i < processorCount; i++)
             {
@@ -492,7 +535,7 @@ int tick()
                 if (queuedRequests[pos] != NULL)
                 {
                     pendingRequest = deqBusRequest(pos);
-                    countDown = CACHE_DELAY;
+                    (*countDown) = CACHE_DELAY;
                     pendingRequest->currentState = WAITING_CACHE;
 
                     lastProc = (pos + 1) % processorCount;
@@ -500,7 +543,7 @@ int tick()
                 }
             }
         }
-        tempreq = tempreq->next; 
+        tempreq = (node**)&((*tempreq)->next); 
     }
     
 
