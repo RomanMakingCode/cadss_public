@@ -1,5 +1,9 @@
 #include <getopt.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <assert.h>
 
 #include <memory.h>
 #include <interconnect.h>
@@ -53,6 +57,14 @@ coher* coherComp;
 memory* memComp;
 
 int CADSS_VERBOSE = 0;
+uint64_t myticker = 0;
+
+int verbose = 1; 
+void printv(const char *format, ...) { // wrapper for printf, only prints when verbose is set to true
+    va_list args;
+    va_start(args, format);
+    if (verbose) vprintf(format, args);
+}
 int processorCount = 1;
 
 static const char* req_state_map[] = {
@@ -207,6 +219,7 @@ static int busRequestQueueSize(int procNum)
 
 interconn* init(inter_sim_args* isa)
 {
+    printv("Init Interconnect\n");
     int op;
 
     while ((op = getopt(isa->arg_count, isa->arg_list, "v")) != -1)
@@ -250,6 +263,7 @@ void registerCoher(coher* cc)
 
 void memReqCallback(int procNum, uint64_t addr)
 {
+    printv("memReqCallBack\n");
     if (processing->top == NULL)
     {
         return;
@@ -270,8 +284,10 @@ void memReqCallback(int procNum, uint64_t addr)
 //We need to check if we add it to pending or processing pile
 void busReq(bus_req_type brt, uint64_t addr, int procNum)
 {
+    printv("BusRequest\n");
     //now on bus request, we are going to check our list to see if that address is being used
     if(checkfor(processing, addr)){
+        printv("adding to pending\n");
         //if true, we need to add it to pending queue
         waitstr* temp = malloc(sizeof(waitstr));
         temp->brt = brt;
@@ -288,6 +304,7 @@ void busReq(bus_req_type brt, uint64_t addr, int procNum)
     //if not add to processing pile
     if (pendingRequest == NULL)
     {
+        printv("Processing new request\n");
         //may fail this assertion
         assert(brt != SHARED);
 
@@ -298,13 +315,16 @@ void busReq(bus_req_type brt, uint64_t addr, int procNum)
         nextReq->procNum = procNum;
         nextReq->dataAvail = 0;
         nextReq->countDown = 0;
-
-        pendingRequest = nextReq;
+        printv("busreq object created\n");
+        //pendingRequest = nextReq;
         nextReq->countDown = CACHE_DELAY;
 
         //add to processing
         node* temp = malloc(sizeof(node));
-        temp->data->request = nextReq;
+        waitstr* tempwait = malloc(sizeof(waitstr));
+        tempwait->request = nextReq; 
+        temp->data = tempwait;
+        printv("segfault\n");
         addNode(&processing, &temp);
         
         return;
@@ -339,8 +359,34 @@ void busReq(bus_req_type brt, uint64_t addr, int procNum)
     }
 }
 
+void printProcessing(){
+    printv("Processing Requests\n");
+    node* temp = processing->top;
+    while(temp != NULL){
+        if(temp->data != NULL && temp->data->request != NULL){
+            printv("Address %lu | ProcNum: %d\n", temp->data->request->addr, temp->data->request->procNum);
+        }
+        temp = temp->next;
+    }
+}
+
+void printPending(){
+    printv("Pending Requests\n");
+    node* temp = processing->top;
+    while(temp != NULL){
+        if(temp->data != NULL){
+            printv("Address: %lu | ProcNum:%d\n", temp->data->addr, temp->data->procnum);
+        }
+        temp = temp->next;
+    }
+}
+
 int tick()
 {
+    myticker++;
+    printv("tick count = %d\n", myticker);
+    printProcessing();
+    printPending();
     //on tick, see if we can process any of the outstanding bus requests
     //TODO: check
     node* pendcheck = pending->top;
@@ -364,6 +410,7 @@ int tick()
     }
     node* tempreq = processing->top;
     while(tempreq != NULL){
+        printv("updating node\n");
         bus_req* currreq = tempreq->data->request; 
         int countDown = tempreq->data->request->countDown;
         if (countDown > 0)
