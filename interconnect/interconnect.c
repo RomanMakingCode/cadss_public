@@ -140,6 +140,7 @@ void delNode(linkedlist** list, node** nodeto){
   node* prev = NULL;
   node* curr = (*list)->top; 
   if (curr == NULL){
+    (*list)->top = NULL;
     return;
   }
   while(curr != NULL){
@@ -388,7 +389,7 @@ void printNode(node* nodeto){
         printv("Node (waiting type) Address: %lu | ProcNum: %d\n", nodeto->data->addr, nodeto->data->procnum);
         return; 
     }
-    printv("Node (bus request type) Address: %lu | ProcNum: %d | CountDown = %d | currentState: ", nodeto->data->request->addr,nodeto->data->request->procNum, nodeto->data->request->countDown);
+    printv("Node (bus request type) Address: %lu | ProcNum: %d | CountDown: %d | data_avil: %s | currentState: ", nodeto->data->request->addr,nodeto->data->request->procNum, nodeto->data->request->countDown, nodeto->data->request->dataAvail ? "true" : "false");
     
     switch(nodeto->data->request->currentState){
         case(NONE):
@@ -418,9 +419,9 @@ void printNode(node* nodeto){
 int tick()
 {
     myticker++;
-    if(myticker > 150){
+    /*if(myticker > 1000){
         assert(false);
-    }
+    }*/
     printv("tick count = %d\n", myticker);
     printProcessing();
     printPending();
@@ -446,7 +447,10 @@ int tick()
         printInterconnState();
     }
     node** tempreq = &processing->top;
-    while((*tempreq) != NULL){
+    node** quicktemp = NULL;
+    bool quicktemp_use = false; 
+    while(tempreq != NULL && (*tempreq) != NULL && (*tempreq)->data != NULL && (*tempreq)->data->request != NULL){
+        printv("start\n");
         printv("updating: "); printNode((*tempreq));
         bus_req* currreq = (*tempreq)->data->request; 
         int *countDown = &((*tempreq)->data->request->countDown);
@@ -505,8 +509,16 @@ int tick()
                     free((*tempreq)->data->request);
                     (*tempreq)->data->request = NULL;
                     //TODO delete node
+                    quicktemp = (node**)&((*tempreq)->next);
+                    quicktemp_use = true;
+                    if(((*tempreq)->next) == NULL){
+                        printv("true\n");
+                    }
+
                     printv("deleting node\n");
                     delNode(&processing, &(*tempreq));
+                    printv("deleted node\n");
+                    printProcessing();
                 }
                 else if ((*tempreq)->data->request->currentState == TRANSFERING_CACHE)
                 {
@@ -519,11 +531,19 @@ int tick()
                                     (*tempreq)->data->request->procNum);
 
                     interconnNotifyState();
+
+                    quicktemp = (node**)&((*tempreq)->next);
+                    quicktemp_use = true;
+                    if(((*tempreq)->next) == NULL){
+                        printv("true\n");
+                    }
+                    
                     free((*tempreq)->data->request);
                     (*tempreq)->data->request = NULL;
 
-                    //todo delete node
+                    //todo delete nodema
                     delNode(&processing, &(*tempreq));
+                    printProcessing();
                 }
             }
         }
@@ -543,10 +563,21 @@ int tick()
                 }
             }
         }
-        tempreq = (node**)&((*tempreq)->next); 
+        printv("onto next node\n");
+        if(quicktemp_use){
+            printv("temp used\n");
+            tempreq = quicktemp;
+            quicktemp = NULL;
+            quicktemp_use = false;
+        } else {
+            printv("no temp\n");
+            tempreq = (node**)&((*tempreq)->next); 
+        }
+        printv("proceed\n");
+    
     }
     
-
+    printv("tick finished\n");
     return 0;
 }
 
