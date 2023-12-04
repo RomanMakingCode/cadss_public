@@ -32,4 +32,17 @@ typedef struct _interconn {
     debug_env_vars dbgEnv;
 } interconn;
 
+typedef struct _linkedlist{
+  node* top;
+} linkedlist; 
+
+linkedlist* new_linkedlist(void){
+  linkedlist* ret = malloc(sizeof(linkedlist));
+  ret->top = NULL;
+  return ret;
+}; 
+
+
+
+
 #endif

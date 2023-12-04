@@ -106,13 +106,15 @@ uint8_t busReq(bus_req_type reqType, uint64_t addr, int processorNum)
                 = snoopMSI(reqType, &ca, currentState, addr, processorNum);
             break;
         case MESI:
-            // TODO: Implement this.
+            nextState
+                = snoopMESI(reqType, &ca, currentState, addr, processorNum);
             break;
         case MOESI:
             // TODO: Implement this.
             break;
         case MESIF:
-            // TODO: Implement this.
+            nextState
+                = snoopMESI(reqType, &ca, currentState, addr, processorNum);
             break;
         default:
             fprintf(stderr, "Undefined coherence scheme - %d\n", cs);
@@ -179,7 +181,8 @@ uint8_t permReq(uint8_t is_read, uint64_t addr, int processorNum)
             break;
 
         case MESI:
-            // TODO: Implement this.
+            nextState = cacheMESI(is_read, &permAvail, currentState, addr, 
+                                processorNum);
             break;
 
         case MOESI:
@@ -187,7 +190,8 @@ uint8_t permReq(uint8_t is_read, uint64_t addr, int processorNum)
             break;
 
         case MESIF:
-            // TODO: Implement this.
+            //nextState = cacheMESIF(is_read, &permAvail, currentState, addr,
+            //                        processorNum);
             break;
 
         default:
@@ -227,7 +231,7 @@ uint8_t invlReq(uint64_t addr, int processorNum)
         case MSI:
             // TODO: Implement this.
             nextState = INVALID;
-            
+
             if (currentState == SHARE){
             } else if (currentState == MODIFIED){
                 inter_sim->busReq(DATA, addr, processorNum); //use when flushing
@@ -235,7 +239,11 @@ uint8_t invlReq(uint64_t addr, int processorNum)
             }
             break;
         case MESI:
-            // TODO: Implement this.
+            nextState = INVALID;
+            if (currentState == MODIFIED){
+                inter_sim->busReq(DATA, addr, processorNum);
+                flush = 1; 
+            }
             break;
 
         case MOESI:

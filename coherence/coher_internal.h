@@ -13,7 +13,10 @@ typedef enum _coherence_states
     INVALID,
     INVALID_MODIFIED,
     INVALID_SHARED,
-    SHARE
+    SHARE,
+    EXCLUSIVE,
+    INVALID_EXCLUSIVE,
+    
 } coherence_states;
 
 typedef enum _coherence_scheme
@@ -28,6 +31,7 @@ typedef enum _coherence_scheme
 coherence_states
 cacheMI(uint8_t is_read, uint8_t* permAvail, coherence_states currentState,
         uint64_t addr, int procNum);
+
 coherence_states
 snoopMI(bus_req_type reqType, cache_action* ca, coherence_states currentState,
         uint64_t addr, int procNum);
