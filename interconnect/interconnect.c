@@ -59,7 +59,7 @@ memory* memComp;
 int CADSS_VERBOSE = 0;
 uint64_t myticker = 0;
 
-int verbose = 0;
+int verbose = 1;
 int veboseUltra = 0;  
 void printv(const char *format, ...) { // wrapper for printf, only prints when verbose is set to true
     va_list args;
@@ -429,8 +429,10 @@ int tick()
         assert(false);
     }*/
     printv("tick count = %d\n", myticker);
-    printProcessing();
-    printPending();
+    if (verbose){
+        printProcessing();
+        printPending();
+    }
     //on tick, see if we can process any of the outstanding bus requests
     //TODO: check
     node* pendcheck = pending->top;
