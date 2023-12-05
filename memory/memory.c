@@ -43,7 +43,7 @@ void registerInterconnect(interconn* interconnect)
 
 int busReq(uint64_t addr, int procNum, void (*callback)(int, uint64_t))
 {
-    assert(pendingRequest == NULL);
+    //assert(pendingRequest == NULL);
 
     pendingRequest = calloc(1, sizeof(memReq));
     pendingRequest->addr = addr;

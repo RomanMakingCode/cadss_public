@@ -59,11 +59,18 @@ memory* memComp;
 int CADSS_VERBOSE = 0;
 uint64_t myticker = 0;
 
-int verbose = 1; 
+int verbose = 0;
+int veboseUltra = 0;  
 void printv(const char *format, ...) { // wrapper for printf, only prints when verbose is set to true
     va_list args;
     va_start(args, format);
     if (verbose) vprintf(format, args);
+}
+
+void printu(const char *format, ...) { // wrapper for printf, only prints when verbose is set to true
+    va_list args;
+    va_start(args, format);
+    if (veboseUltra) vprintf(format, args);
 }
 int processorCount = 1;
 
@@ -316,7 +323,7 @@ void busReq(bus_req_type brt, uint64_t addr, int procNum)
         nextReq->procNum = procNum;
         nextReq->dataAvail = 0;
         nextReq->countDown = 0;
-        printv("busreq object created\n");
+        printv("busreq object created, proc: %d, addr %lu\n", procNum, addr);
         //pendingRequest = nextReq;
         nextReq->countDown = CACHE_DELAY;
 
@@ -325,7 +332,6 @@ void busReq(bus_req_type brt, uint64_t addr, int procNum)
         waitstr* tempwait = malloc(sizeof(waitstr));
         tempwait->request = nextReq; 
         temp->data = tempwait;
-        printv("segfault\n");
         addNode(&processing, &temp);
         
         return;
@@ -429,11 +435,31 @@ int tick()
     //TODO: check
     node* pendcheck = pending->top;
     while(pendcheck != NULL){
-        if(pendcheck->data != NULL && !checkfor(processing, pendcheck->data->addr)){
-            busReq(pendcheck->data->brt, pendcheck->data->addr, pendcheck->data->procnum);
-            node* quicktemp = pendcheck->next; 
-            delNode(&pending, &pendcheck);
-            pendcheck = quicktemp; 
+        if(pendcheck->data != NULL) {
+            if(!checkfor(processing, pendcheck->data->addr)){
+                busReq(pendcheck->data->brt, pendcheck->data->addr, pendcheck->data->procnum);
+                node* quicktemp = pendcheck->next; 
+                delNode(&pending, &pendcheck);
+                pendcheck = quicktemp; 
+            } else {
+                //check if we can snoop
+                //find address match
+                node* temp = processing->top;
+                while(temp != NULL){
+                    //remove if shared
+                    if (temp->data->request->addr == pendcheck->data->addr){
+                        printv("Match!\n");
+                        if (temp->data->request->shared){
+                            printv("Shared!\n");
+                            node* quicktemp = pendcheck->next; 
+                            delNode(&pending, &pendcheck);
+                            pendcheck = quicktemp; 
+                        }
+                    }
+                    temp = temp->next; 
+                }
+                pendcheck = pendcheck->next;
+            }
         } else {
             pendcheck = pendcheck->next;
         }
@@ -450,7 +476,7 @@ int tick()
     node** quicktemp = NULL;
     bool quicktemp_use = false; 
     while(tempreq != NULL && (*tempreq) != NULL && (*tempreq)->data != NULL && (*tempreq)->data->request != NULL){
-        printv("start\n");
+        printu("start\n");
         printv("updating: "); printNode((*tempreq));
         bus_req* currreq = (*tempreq)->data->request; 
         int *countDown = &((*tempreq)->data->request->countDown);
@@ -473,7 +499,7 @@ int tick()
                 printv("countdown up ---------------\n");
                 if ((*tempreq)->data->request->currentState == WAITING_CACHE)
                 {
-                    printv("making Mempry request\n");
+                    printv("Issuing Memory request\n");
                     // Make a request to memory.
                     (*tempreq)->data->request->countDown
                         = memComp->busReq((*tempreq)->data->request->addr,
@@ -498,31 +524,31 @@ int tick()
                 }
                 else if ((*tempreq)->data->request->currentState == TRANSFERING_MEMORY)
                 {
-                    printv("tranfsering memory\n");
+                    printu("Transfering Memory\n");
                     bus_req_type brt
                         = ((*tempreq)->data->request->shared == 1) ? SHARED : DATA;
                     coherComp->busReq(brt, (*tempreq)->data->request->addr,
                                     (*tempreq)->data->request->procNum);
 
                     interconnNotifyState();
-                    printv("freeing structure\n");
+                    printu("freeing structure\n");
                     free((*tempreq)->data->request);
                     (*tempreq)->data->request = NULL;
                     //TODO delete node
                     quicktemp = (node**)&((*tempreq)->next);
                     quicktemp_use = true;
                     if(((*tempreq)->next) == NULL){
-                        printv("true\n");
+                        printu("true\n");
                     }
 
-                    printv("deleting node\n");
+                    printu("deleting node\n");
                     delNode(&processing, &(*tempreq));
-                    printv("deleted node\n");
+                    printu("deleted node\n");
                     printProcessing();
                 }
                 else if ((*tempreq)->data->request->currentState == TRANSFERING_CACHE)
                 {
-                    printv("tranfsering cache\n");
+                    printv("Transfering Cache\n");
                     bus_req_type brt = (*tempreq)->data->request->brt;
                     if ((*tempreq)->data->request->shared == 1)
                         brt = SHARED;
@@ -534,16 +560,13 @@ int tick()
 
                     quicktemp = (node**)&((*tempreq)->next);
                     quicktemp_use = true;
-                    if(((*tempreq)->next) == NULL){
-                        printv("true\n");
-                    }
                     
                     free((*tempreq)->data->request);
                     (*tempreq)->data->request = NULL;
 
                     //todo delete nodema
                     delNode(&processing, &(*tempreq));
-                    printProcessing();
+                    //printProcessing();
                 }
             }
         }
@@ -563,17 +586,24 @@ int tick()
                 }
             }
         }
-        printv("onto next node\n");
+        else if ((*countDown) < 0)
+        {
+
+            quicktemp = (node**)&((*tempreq)->next);
+            quicktemp_use = true;
+            delNode(&processing, &(*tempreq));
+        }
+        printu("onto next node\n");
         if(quicktemp_use){
-            printv("temp used\n");
+            printu("temp used\n");
             tempreq = quicktemp;
             quicktemp = NULL;
             quicktemp_use = false;
         } else {
-            printv("no temp\n");
+            printu("no temp\n");
             tempreq = (node**)&((*tempreq)->next); 
         }
-        printv("proceed\n");
+        printu("proceed\n");
     
     }
     
@@ -634,14 +664,21 @@ void interconnNotifyState(void)
 // was satisfied by a cache-to-cache transfer.
 int busReqCacheTransfer(uint64_t addr, int procNum)
 {
+    printv("busReqCacheTransfer\n");
     //TODO: iterate through active proccesses and see if they are the one that is done
     assert(processing->top->data);
 
     node* temp = processing->top;
     while(temp != NULL && temp->data != NULL){
         bus_req* Request = temp->data->request;
-        if (addr == Request->addr && procNum == Request->procNum)
+        if (addr == Request->addr && procNum == Request->procNum){
+            if(Request->currentState == TRANSFERING_CACHE){
+                printu("True\n");
+            } else {
+                printu("False\n");
+            }
             return (Request->currentState == TRANSFERING_CACHE);
+        }
         temp = temp->next;
     }
     return 0;
