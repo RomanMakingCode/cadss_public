@@ -59,7 +59,7 @@ memory* memComp;
 int CADSS_VERBOSE = 0;
 uint64_t myticker = 0;
 
-int verbose = 1;
+int verbose = 0;
 int veboseUltra = 0;  
 void printv(const char *format, ...) { // wrapper for printf, only prints when verbose is set to true
     va_list args;
@@ -92,6 +92,7 @@ const int CACHE_TRANSFER = 10;
 
 void registerCoher(coher* cc);
 void delNodeProcessing(node* nodeto);
+void printNode(node* nodeto);
 void busReq(bus_req_type brt, uint64_t addr, int procNum);
 int busReqCacheTransfer(uint64_t addr, int procNum);
 void printInterconnState(void);
@@ -132,20 +133,27 @@ bool checkfor(linkedlist* list, uint64_t addr){
 };
 
 void addNode(linkedlist** list, node** nodeto){
-  node* temp = (*list)->top;
-  if (temp == NULL){
-    (*list)->top = *nodeto;
-    return;
-  }
-  while(temp->next != NULL){
-    temp = temp->next;
-  }
-  temp->next = *nodeto;
-  return; 
+    printv("adding node to processing\n");
+    printNode(*nodeto);
+    node* temp = (*list)->top;
+    if (temp == NULL){
+        (*list)->top = *nodeto;
+        (*list)->top->next = NULL;
+
+        return;
+    }
+    while(temp->next != NULL){
+        temp = temp->next;
+    }
+    temp->next = *nodeto;
+    printv("finished adding\n");
+    return; 
 }
 
 void addNodePending(node* nodeto){
   node* temp = pending->top;
+  printv("Adding Pending node\n");
+  printNode(nodeto);
   if (temp == NULL){
     pending->top = nodeto;
     return;
@@ -154,21 +162,24 @@ void addNodePending(node* nodeto){
     temp = temp->next;
   }
   temp->next = nodeto;
+  printv("finished adding to pending\n");
   return; 
 }
 
 void addNodePending2(uint64_t addr, int proc){
-  node* temp = pending->top;
-  if (temp == NULL){
-    pending->top = malloc(sizeof(waitstr));
-    pending->top->data->addr = addr;
-    pending->top->data->procnum = proc;
+    node* temp = pending->top;
 
-    return;
-  }
-  while(temp->next != NULL){
-    temp = temp->next;
-  }
+    printv("Adding Pending node of address| %lu and proc %d\n", addr, proc);
+    if (temp == NULL){
+        pending->top = malloc(sizeof(waitstr));
+        pending->top->data->addr = addr;
+        pending->top->data->procnum = proc;
+
+        return;
+    }
+    while(temp->next != NULL){
+        temp = temp->next;
+    }
     temp->next = malloc(sizeof(waitstr));
     temp->data->addr = addr;
     temp->data->procnum = proc; 
@@ -597,6 +608,7 @@ int tick()
     while(pendcheck != NULL){
         if(pendcheck->data != NULL) {
             if(!checkfor(processing, pendcheck->data->addr)){
+                printv("RUnning pending instruction\n");
                 busReq(pendcheck->data->brt, pendcheck->data->addr, pendcheck->data->procnum);
                 node* quicktemp = pendcheck->next; 
                 delNodePending(pendcheck);
@@ -610,7 +622,7 @@ int tick()
                     if (temp->data->request->addr == pendcheck->data->addr){
                         printv("Match!\n");
                         if (temp->data->request->shared){
-                            printv("Shared!\n");
+                            printv("snooped!\n");
                             node* quicktemp = pendcheck->next; 
                             delNodePending(pendcheck);
                             pendcheck = quicktemp; 
@@ -694,7 +706,7 @@ int tick()
                     interconnNotifyState();
                     printu("freeing structure\n");
                     //free((*tempreq)->data->request);
-                    (*tempreq)->data->request = NULL;
+                    //(*tempreq)->data->request = NULL;
                     //TODO delete node
                     quicktemp = (node**)&((*tempreq)->next);
                     quicktemp_use = true;
@@ -724,7 +736,7 @@ int tick()
                     quicktemp_use = true;
                     
                     //free((*tempreq)->data->request);
-                    (*tempreq)->data->request = NULL;
+                    //(*tempreq)->data->request = NULL;
 
                     //todo delete nodema
                     //delNode(&processing, &(*tempreq));
@@ -767,6 +779,7 @@ int tick()
         printu("proceed\n");
     
     }
+    printProcessing();
     printv("tick finished\n");
     return 0;
 }
@@ -833,9 +846,9 @@ int busReqCacheTransfer(uint64_t addr, int procNum)
         bus_req* Request = temp->data->request;
         if (addr == Request->addr && procNum == Request->procNum){
             if(Request->currentState == TRANSFERING_CACHE){
-                printu("True\n");
+                printv("True\n");
             } else {
-                printu("False\n");
+                printv("False\n");
             }
             return (Request->currentState == TRANSFERING_CACHE);
         }
