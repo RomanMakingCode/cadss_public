@@ -91,6 +91,7 @@ const int CACHE_DELAY = 10;
 const int CACHE_TRANSFER = 10;
 
 void registerCoher(coher* cc);
+void delNodeProcessing(node* nodeto);
 void busReq(bus_req_type brt, uint64_t addr, int procNum);
 int busReqCacheTransfer(uint64_t addr, int procNum);
 void printInterconnState(void);
@@ -143,28 +144,227 @@ void addNode(linkedlist** list, node** nodeto){
   return; 
 }
 
+void addNodePending(node* nodeto){
+  node* temp = pending->top;
+  if (temp == NULL){
+    pending->top = nodeto;
+    return;
+  }
+  while(temp->next != NULL){
+    temp = temp->next;
+  }
+  temp->next = nodeto;
+  return; 
+}
+
+void addNodePending2(uint64_t addr, int proc){
+  node* temp = pending->top;
+  if (temp == NULL){
+    pending->top = malloc(sizeof(waitstr));
+    pending->top->data->addr = addr;
+    pending->top->data->procnum = proc;
+
+    return;
+  }
+  while(temp->next != NULL){
+    temp = temp->next;
+  }
+    temp->next = malloc(sizeof(waitstr));
+    temp->data->addr = addr;
+    temp->data->procnum = proc; 
+  return; 
+}
+
+void printNode(node* nodeto){
+    if(nodeto->data == NULL){
+        printv("NULL Node\n");
+    } else if (nodeto->data->request == NULL){
+        printv("Node (waiting type) Address: %lu | ProcNum: %d\n", nodeto->data->addr, nodeto->data->procnum);
+        return; 
+    }
+    printv("Node (bus request type) Address: %lu | ProcNum: %d | CountDown: %d | data_avil: %s | currentState: ", nodeto->data->request->addr,nodeto->data->request->procNum, nodeto->data->request->countDown, nodeto->data->request->dataAvail ? "true" : "false");
+    
+    switch(nodeto->data->request->currentState){
+        case(NONE):
+            printv("NONE\n");
+            break;
+        case(QUEUED):
+            printv("QUEUED\n");
+            break;
+        case(TRANSFERING_CACHE):
+            printv("TRANSFERING_CACHE\n");
+            break;
+        case(TRANSFERING_MEMORY):
+            printv("TRANSFERING_MEMORY\n");
+            break;
+        case(WAITING_CACHE):
+            printv("WAITING_CACHE\n");
+            break;
+        case(WAITING_MEMORY):
+            printv("WAITING_MEMORY\n");
+            break;
+        default:
+            printv("ERROR\n");
+            break;
+    }
+}
+
+
+void printProcessing(){
+    printv("Processing Requests\n");
+    node* temp = processing->top;
+    while(temp != NULL){
+        if(temp->data != NULL && temp->data->request != NULL){
+            printNode(temp);
+            if(temp->data->request->currentState > 5){
+                printv("err\n");
+                delNodeProcessing(temp);
+                return;
+            }
+        }
+        temp = temp->next;
+    }
+}
+
 void delNode(linkedlist** list, node** nodeto){
+    printv("Deleting node: \n");
+    printNode(*nodeto);
+    printv("current processing\n");
+    printProcessing();
+
   node* prev = NULL;
-  node* curr = (*list)->top; 
+  node* curr = (*list)->top;
+  printNode(curr);
   if (curr == NULL){
+    printv("true\n");
     (*list)->top = NULL;
     return;
   }
   while(curr != NULL){
     if(curr == *nodeto){
+        printv("match found in delete\n");
       if(prev == NULL){
         (*list)->top = (*list)->top->next;
+        //printv("new processing\n");
+        //printProcessing();
         return; 
       } else {
         prev->next = curr->next;
+        //printv("new processing elsed\n");
+        //printProcessing();
         return; 
       }
     }
     prev = curr;
     curr = curr->next;
   }
+  printv("nothing deleted\n");
   return; 
 }
+
+void delNodeProcessing(node* nodeto){
+    printu("Deleting node: \n");
+    if(veboseUltra)
+        printNode(nodeto);
+    printu("current processing\n");
+    if(veboseUltra)
+        printProcessing();
+
+    node* prev = NULL;
+    node* curr = processing->top;
+    if(veboseUltra)
+        printNode(curr);
+    if (curr == NULL){
+        printu("true\n");
+        processing->top = NULL;
+        return;
+    }
+    while(curr != NULL){
+        if(curr == nodeto){
+            printu("match found in delete\n");
+        if(prev == NULL){
+            processing->top = processing->top->next;
+            //printv("new processing\n");
+            //printProcessing();
+            return; 
+        } else {
+            prev->next = curr->next;
+            //printv("new processing elsed\n");
+            //printProcessing();
+            return; 
+        }
+        }
+    prev = curr;
+    curr = curr->next;
+  }
+  printu("nothing deleted\n");
+  return; 
+}
+
+void delNodePending(node* nodeto){
+    printv("Deleting node: \n");
+    printNode(nodeto);
+    printv("current processing\n");
+    printProcessing();
+    node* prev = NULL;
+    node* curr = pending->top;
+    printNode(curr);
+    if (curr == NULL){
+        printv("true\n");
+        pending->top = NULL;
+        return;
+    }
+    while(curr != NULL){
+        if(curr == nodeto){
+            printv("match found in delete\n");
+        if(prev == NULL){
+            pending->top = pending->top->next;
+            //printv("new processing\n");
+            //printProcessing();
+            return; 
+        } else {
+            prev->next = curr->next;
+            //printv("new processing elsed\n");
+            //printProcessing();
+            return; 
+        }
+        }
+    prev = curr;
+    curr = curr->next;
+  }
+  printv("nothing deleted\n");
+  return; 
+}
+/*
+void deleteNode(struct Node** head_ref, int key) 
+{ 
+    // Store head node 
+    struct Node *temp = *head_ref, *prev; 
+  
+    // If head node itself holds the key to be deleted 
+    if (temp != NULL && temp->data == key) { 
+        *head_ref = temp->next; // Changed head 
+        free(temp); // free old head 
+        return; 
+    } 
+  
+    // Search for the key to be deleted, keep track of the 
+    // previous node as we need to change 'prev->next' 
+    while (temp != NULL && temp->data != key) { 
+        prev = temp; 
+        temp = temp->next; 
+    } 
+  
+    // If key was not present in linked list 
+    if (temp == NULL) 
+        return; 
+  
+    // Unlink the node from linked list 
+    prev->next = temp->next; 
+  
+    free(temp); // Free memory 
+} */
+  
 
 
 // Helper methods for per-processor request queues.
@@ -227,7 +427,7 @@ static int busRequestQueueSize(int procNum)
 
 interconn* init(inter_sim_args* isa)
 {
-    printv("Init Interconnect\n");
+    //printv("Init Interconnect\n");
     int op;
 
     while ((op = getopt(isa->arg_count, isa->arg_list, "v")) != -1)
@@ -259,6 +459,8 @@ interconn* init(inter_sim_args* isa)
     pending = new_linkedlist();
     processing = new_linkedlist();
 
+    printf("Starting\n");
+
     return self;
 }
 
@@ -271,7 +473,7 @@ void registerCoher(coher* cc)
 
 void memReqCallback(int procNum, uint64_t addr)
 {
-    printv("memReqCallBack\n");
+    //printv("memReqCallBack\n");
     if (processing->top == NULL)
     {
         return;
@@ -292,10 +494,10 @@ void memReqCallback(int procNum, uint64_t addr)
 //We need to check if we add it to pending or processing pile
 void busReq(bus_req_type brt, uint64_t addr, int procNum)
 {
-    printv("BusRequest\n");
+    //printv("BusRequest\n");
     //now on bus request, we are going to check our list to see if that address is being used
     if(checkfor(processing, addr)){
-        printv("adding to pending\n");
+        //printv("adding to pending\n");
         //if true, we need to add it to pending queue
         waitstr* temp = malloc(sizeof(waitstr));
         temp->brt = brt;
@@ -305,14 +507,15 @@ void busReq(bus_req_type brt, uint64_t addr, int procNum)
         node* temppy = malloc(sizeof(node));
         temppy->data = temp;
         temppy->next = NULL; 
-        
-        addNode(&pending, &temppy);
+        printv("addres %lu and proc %d\n", addr, processing);
+        //addNodePending(temppy);
+        addNodePending2(addr, procNum);
         return; 
     }
     //if not add to processing pile
     if (pendingRequest == NULL)
     {
-        printv("Processing new request\n");
+        //printv("Processing new request\n");
         //may fail this assertion
         assert(brt != SHARED);
 
@@ -323,7 +526,7 @@ void busReq(bus_req_type brt, uint64_t addr, int procNum)
         nextReq->procNum = procNum;
         nextReq->dataAvail = 0;
         nextReq->countDown = 0;
-        printv("busreq object created, proc: %d, addr %lu\n", procNum, addr);
+        //printv("busreq object created, proc: %d, addr %lu\n", procNum, addr);
         //pendingRequest = nextReq;
         nextReq->countDown = CACHE_DELAY;
 
@@ -366,17 +569,6 @@ void busReq(bus_req_type brt, uint64_t addr, int procNum)
     }
 }
 
-void printProcessing(){
-    printv("Processing Requests\n");
-    node* temp = processing->top;
-    while(temp != NULL){
-        if(temp->data != NULL && temp->data->request != NULL){
-            printv("Address %lu | ProcNum: %d\n", temp->data->request->addr, temp->data->request->procNum);
-        }
-        temp = temp->next;
-    }
-}
-
 void printPending(){
     printv("Pending Requests\n");
     node* temp = processing->top;
@@ -385,40 +577,6 @@ void printPending(){
             printv("Address: %lu | ProcNum:%d\n", temp->data->addr, temp->data->procnum);
         }
         temp = temp->next;
-    }
-}
-
-void printNode(node* nodeto){
-    if(nodeto->data == NULL){
-        printv("NULL Node\n");
-    } else if (nodeto->data->request == NULL){
-        printv("Node (waiting type) Address: %lu | ProcNum: %d\n", nodeto->data->addr, nodeto->data->procnum);
-        return; 
-    }
-    printv("Node (bus request type) Address: %lu | ProcNum: %d | CountDown: %d | data_avil: %s | currentState: ", nodeto->data->request->addr,nodeto->data->request->procNum, nodeto->data->request->countDown, nodeto->data->request->dataAvail ? "true" : "false");
-    
-    switch(nodeto->data->request->currentState){
-        case(NONE):
-            printv("NONE\n");
-            break;
-        case(QUEUED):
-            printv("QUEUED\n");
-            break;
-        case(TRANSFERING_CACHE):
-            printv("TRANSFERING_CACHE\n");
-            break;
-        case(TRANSFERING_MEMORY):
-            printv("TRANSFERING_MEMORY\n");
-            break;
-        case(WAITING_CACHE):
-            printv("WAITING_CACHE\n");
-            break;
-        case(WAITING_MEMORY):
-            printv("WAITING_MEMORY\n");
-            break;
-        default:
-            printv("ERROR\n");
-            break;
     }
 }
 
@@ -441,7 +599,7 @@ int tick()
             if(!checkfor(processing, pendcheck->data->addr)){
                 busReq(pendcheck->data->brt, pendcheck->data->addr, pendcheck->data->procnum);
                 node* quicktemp = pendcheck->next; 
-                delNode(&pending, &pendcheck);
+                delNodePending(pendcheck);
                 pendcheck = quicktemp; 
             } else {
                 //check if we can snoop
@@ -454,7 +612,7 @@ int tick()
                         if (temp->data->request->shared){
                             printv("Shared!\n");
                             node* quicktemp = pendcheck->next; 
-                            delNode(&pending, &pendcheck);
+                            delNodePending(pendcheck);
                             pendcheck = quicktemp; 
                         }
                     }
@@ -482,7 +640,8 @@ int tick()
         printv("updating: "); printNode((*tempreq));
         bus_req* currreq = (*tempreq)->data->request; 
         int *countDown = &((*tempreq)->data->request->countDown);
-        if (countDown > 0)
+        //printv("what is coundown rn: %lu \n", *countDown);
+        if (*countDown > 0)
         {
             assert(currreq != NULL);
             (*countDown)--; 
@@ -534,7 +693,7 @@ int tick()
 
                     interconnNotifyState();
                     printu("freeing structure\n");
-                    free((*tempreq)->data->request);
+                    //free((*tempreq)->data->request);
                     (*tempreq)->data->request = NULL;
                     //TODO delete node
                     quicktemp = (node**)&((*tempreq)->next);
@@ -544,9 +703,10 @@ int tick()
                     }
 
                     printu("deleting node\n");
-                    delNode(&processing, &(*tempreq));
+                    //printNode(*tempreq);
+                    delNodeProcessing((*tempreq));
                     printu("deleted node\n");
-                    printProcessing();
+                    //printProcessing();
                 }
                 else if ((*tempreq)->data->request->currentState == TRANSFERING_CACHE)
                 {
@@ -563,17 +723,17 @@ int tick()
                     quicktemp = (node**)&((*tempreq)->next);
                     quicktemp_use = true;
                     
-                    free((*tempreq)->data->request);
+                    //free((*tempreq)->data->request);
                     (*tempreq)->data->request = NULL;
 
                     //todo delete nodema
-                    delNode(&processing, &(*tempreq));
+                    //delNode(&processing, &(*tempreq));
+                    delNodeProcessing((*tempreq));
                     //printProcessing();
                 }
             }
-        }
-        else if ((*countDown) == 0)
-        {
+        } else if ((*countDown) == 0) {
+            delNodeProcessing(*tempreq);
             for (int i = 0; i < processorCount; i++)
             {
                 int pos = (i + lastProc) % processorCount;
@@ -587,13 +747,12 @@ int tick()
                     break;
                 }
             }
-        }
-        else if ((*countDown) < 0)
-        {
+        } else if ((*countDown) < 0) {
+            printv("overflow delete???\n");
 
             quicktemp = (node**)&((*tempreq)->next);
             quicktemp_use = true;
-            delNode(&processing, &(*tempreq));
+            delNodeProcessing((*tempreq));
         }
         printu("onto next node\n");
         if(quicktemp_use){
@@ -608,7 +767,6 @@ int tick()
         printu("proceed\n");
     
     }
-    
     printv("tick finished\n");
     return 0;
 }
