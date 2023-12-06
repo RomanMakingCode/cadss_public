@@ -135,6 +135,7 @@ bool checkfor(linkedlist* list, uint64_t addr){
 void addNode(linkedlist** list, node** nodeto){
     printv("adding node to processing\n");
     printNode(*nodeto);
+    (*nodeto)->next = NULL;
     node* temp = (*list)->top;
     if (temp == NULL){
         (*list)->top = *nodeto;
